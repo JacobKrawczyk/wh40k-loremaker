@@ -1,68 +1,147 @@
+// FILE: src/app/api/generate/route.ts
 import { NextResponse } from "next/server";
+import type { ScenarioInput } from "@/lib/types";
+import { buildNarrative } from "@/lib/narrativeBuilder";
 
-type Payload = {
-  campaignName: string;
-  battleFormat: "1v1" | "2v2" | "ffa";
-  playerFaction: string;
-  otherFactions: string;
-  planet: string;
-  tone: string;
-  stakes: string;
-};
-
+/**
+ * If OPENAI_API_KEY is set, we try to enhance the builder output via OpenAI.
+ * If the key is missing or the request fails, we return the pure builder output.
+ *
+ * Toggle with env:
+ *   - OPENAI_API_KEY=sk-...         // required to enable AI
+ *   - OPENAI_MODEL=gpt-4o-mini      // optional (default)
+ *   - AI_ENABLED=1                  // optional; if "0" we skip AI even if key exists
+ */
 export async function POST(req: Request) {
-  const body = (await req.json()) as Partial<Payload>;
+  const body = (await req.json()) as Partial<ScenarioInput>;
+  const base = buildNarrative(body as ScenarioInput);
 
-const campaignName = body.campaignName?.trim() || "Untitled Campaign";
-const battleFormat = (body.battleFormat as "1v1" | "2v2" | "ffa") || "1v1";
+  const useAI =
+    process.env.AI_ENABLED !== "0" &&
+    typeof process.env.OPENAI_API_KEY === "string" &&
+    process.env.OPENAI_API_KEY.length > 0;
 
-// neutral fallbacks (no IP-specific names)
-const playerFaction = (body.playerFaction?.trim() || "Faction").slice(0, 80);
-const otherFactions = (body.otherFactions?.trim() || "Opponents").slice(0, 120);
-const planet = (body.planet?.trim() || "Theater").slice(0, 80);
-const tone = (body.tone?.trim() || "Tone").slice(0, 40);
-const stakes = (body.stakes?.trim() || "Primary objective").slice(0, 200);
+  if (!useAI) {
+    return NextResponse.json({ narrative: base, aiUsed: false });
+  }
 
-  const narrative = `# ${campaignName}: Pre-Battle Dossier
+  try {
+    const modelUsed = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
-**Battle format (player count)**: ${battleFormat.toUpperCase()}
-**Location**: ${planet}
-**Tone**: ${tone}
+    const enhanced = await enhanceWithOpenAI({
+      input: body,
+      baseMarkdown: base,
+      model: modelUsed,
+      apiKey: process.env.OPENAI_API_KEY!,
+    });
 
-## Player Faction
-- **Name**: ${playerFaction}
-- **Personal stakes**: ${stakes}
+    console.info(`[AI] Enhanced narrative using model: ${modelUsed}`);
 
-## Other Factions
-- **Present**: ${otherFactions}
+    const narrative =
+      typeof enhanced === "string" && enhanced.trim().length > base.length * 0.5
+        ? enhanced.trim()
+        : base;
 
-## Overarching Story Hook
-A shard of pre-Heresy intelligence has surfaced on ${planet}, drawing ${playerFaction} and ${otherFactions} into a collision of duty, vengeance, and opportunism.
+    return NextResponse.json({ narrative, aiUsed: true });
+  } catch (err) {
+    const aiError =
+      err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown error";
+    console.error("[/api/generate] AI enhance failed – falling back:", aiError);
+    // Truncate the error we return to the client for safety/noise
+    const short = String(aiError).slice(0, 240);
+    return NextResponse.json({ narrative: base, aiUsed: false, aiError: short });
+  }
+}
 
-## Faction Entries (motives & alliances)
-- **${playerFaction}**: Deploy to secure ${stakes}. Alliance possible with lore-plausible factions if it preserves the asset; ceasefire collapses on betrayal.
-- **${otherFactions}**: Each arrives with clear goals (artifacts, revenge, territory). Temporary alliances must be plausible in canon and fragile by design.
+async function enhanceWithOpenAI(opts: {
+  input: Partial<ScenarioInput>;
+  baseMarkdown: string;
+  model: string;
+  apiKey: string;
+}): Promise<string> {
+  const { input, baseMarkdown, model, apiKey } = opts;
 
-## Objectives
-### Matched-play (common)
-1) Hold central control points.
-2) Destroy priority enemy units.
+  const system = [
+    "You are WH40K Narrative Campaign Engine.",
+    "Enhance the provided Markdown scenario for Warhammer 40,000 with vivid grimdark style,",
+    "but DO NOT change the section order or the tabletop rules semantics.",
+    "Always keep all distances in inches on a 40\"x60\" board.",
+    "Each faction must keep exactly one narrative objective with the same mechanics and reward (+3 RP).",
+    "Keep risk scores and tables, but you may clarify wording.",
+    "Do not add placeholders; produce complete text.",
+    "Output ONLY raw Markdown — do not wrap your answer in code fences.",
+  ].join(" ");
 
-### Narrative (per-faction)
-- **${playerFaction}**: Extract the vault codes from a battlefield relay and evacuate a Techmarine alive. (+3 RP)
-- **${otherFactions}**: Define a signature narrative objective aligned with their motives. (+3 RP)
+  const user = [
+    "Input (JSON, minimal):",
+    "```json",
+    JSON.stringify(
+      {
+        campaignName: input.campaignName ?? "",
+        battleFormat: input.battleFormat ?? "1v1",
+        playerFaction: input.playerFaction ?? "",
+        otherFactions: input.otherFactions ?? "",
+        planet: input.planet ?? "",
+        tone: input.tone ?? "",
+        stakes: input.stakes ?? "",
+      },
+      null,
+      2
+    ),
+    "```",
+    "",
+    "Base Markdown to enhance (preserve structure & rules exactly, improve prose only):",
+    "```md",
+    baseMarkdown,
+    "```",
+  ].join("\n");
 
-### Narrative Achievement Points
-- Minor feats grant small persistent perks (rerolls, deployment priority, initiative edges) tracked as Resonance Points (RP).
+  // Use Chat Completions via fetch to avoid SDK peer-dep issues.
+  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.7,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    }),
+  });
 
-## Resonance Points (RP) – Updated Economy
-- +3 RP: Complete your narrative objective.
-- +1 RP: Win via standard VP.
-- +1 RP: Cinematic Moment (only if opponent agrees).
-Spend RP: 2 RP revive named character (skip one game if not revived); 2 RP re-roll mission type/secondary; 3 RP win deployment roll-off; 3 RP force opponent to redeploy one unit to a chosen half of their DZ; 4 RP one free Stratagem; 5 RP buy 1 Campaign Game Point (CGP).
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`OpenAI HTTP ${resp.status}: ${text}`);
+  }
 
-## Risk Scores (1–5)
-Assign risk to each objective considering 40x60 board, DZs, unit movement, exposure time, and enemy contesting paths.`;
+  const data = (await resp.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
 
-  return NextResponse.json({ narrative });
+  const content = data?.choices?.[0]?.message?.content ?? "";
+  return unwrapMarkdown(content);
+}
+
+/** Strip ```md ... ``` or generic ``` ... ``` fences if the model wrapped the output */
+function unwrapMarkdown(s: string): string {
+  const txt = (s ?? "").trim();
+
+  // Exact fenced block ```md ... ```
+  const m1 = txt.match(/^```(?:md|markdown)\s*\n([\s\S]*?)\n```$/i);
+  if (m1) return m1[1].trim();
+
+  // Generic fenced block ``` ... ```
+  const m2 = txt.match(/^```\s*\n([\s\S]*?)\n```$/);
+  if (m2) return m2[1].trim();
+
+  // Starts with fence but no tidy close — strip first/last fence lines if present
+  if (txt.startsWith("```")) {
+    return txt.replace(/^```[^\n]*\n?/, "").replace(/```$/, "").trim();
+  }
+
+  return txt;
 }
