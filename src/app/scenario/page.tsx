@@ -1,8 +1,9 @@
+// FILE: src/app/scenario/page.tsx
 "use client";
 
 import ReactMarkdown from "react-markdown";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -12,12 +13,38 @@ import { useScenarioStore } from "@/lib/scenarioStore";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ScenarioInputSchema, type ScenarioInputForm } from "@/lib/validation";
+import {
+  SEGMENTUMS,
+  FACTION_OPTIONS,
+  getSubfactionOptions,
+  getPlanetOptionsBySegmentum,
+  formatFactionChoice,
+} from "@/lib/options";
 
 type ApiResp = {
   narrative?: string;
   aiUsed?: boolean;
   aiError?: string;
 };
+
+// Thematic team labels (instead of "Group A/B")
+const WARHOST_NAMES = ["Warhost Alpha", "Warhost Beta", "Warhost Gamma", "Warhost Delta"] as const;
+
+// Supported layouts per battle format
+const FORMAT_MATRIX: Record<
+  "1v1" | "2v2" | "3v3" | "4v4" | "ffa" | "2v2v2v2",
+  { teams: number; playersPerTeam: number }
+> = {
+  "1v1": { teams: 2, playersPerTeam: 1 },
+  "2v2": { teams: 2, playersPerTeam: 2 },
+  "3v3": { teams: 2, playersPerTeam: 3 },
+  "4v4": { teams: 2, playersPerTeam: 4 },
+  ffa: { teams: 4, playersPerTeam: 1 }, // 4-way free-for-all (1 player each)
+  "2v2v2v2": { teams: 4, playersPerTeam: 2 },
+};
+
+type PlayerSel = { factionKey: string; subKey?: string };
+type TeamSel = PlayerSel[];
 
 export default function Page() {
   const [loading, setLoading] = useState(false);
@@ -30,6 +57,8 @@ export default function Page() {
     register,
     handleSubmit,
     formState: { errors },
+    setValue,
+    watch,
   } = useForm<ScenarioInputForm>({
     resolver: zodResolver(ScenarioInputSchema),
     defaultValues: {
@@ -43,6 +72,76 @@ export default function Page() {
     },
   });
 
+  // Dependent selects for location
+  const [segmentum, setSegmentum] = useState<string>("");
+  const planetOptions = useMemo(
+    () => getPlanetOptionsBySegmentum(segmentum),
+    [segmentum]
+  );
+
+  // Dynamic teams UI driven by selected format
+  const selectedFormat =
+    (watch("battleFormat") as keyof typeof FORMAT_MATRIX) ?? "1v1";
+  const layout = FORMAT_MATRIX[selectedFormat] ?? FORMAT_MATRIX["1v1"];
+
+  const [teams, setTeams] = useState<TeamSel[]>(
+    Array.from({ length: layout.teams }, () =>
+      Array.from({ length: layout.playersPerTeam }, () => ({ factionKey: "", subKey: "" }))
+    )
+  );
+
+  // Keep teams array shape in sync with selected format (preserve existing picks when possible)
+  useEffect(() => {
+    setTeams((prev) => {
+      const next: TeamSel[] = Array.from({ length: layout.teams }, (_, ti) => {
+        const prevTeam = prev[ti] ?? [];
+        return Array.from({ length: layout.playersPerTeam }, (_, pi) => {
+          return prevTeam[pi] ?? { factionKey: "", subKey: "" };
+        });
+      });
+      return next;
+    });
+  }, [layout.teams, layout.playersPerTeam]);
+
+  // Helper to update a player cell
+  const setPlayerFaction = (teamIdx: number, playerIdx: number, factionKey: string) => {
+    setTeams((prev) => {
+      const copy = prev.map((t) => t.slice());
+      copy[teamIdx][playerIdx] = { factionKey, subKey: "" }; // reset subfaction on faction change
+      return copy;
+    });
+  };
+  const setPlayerSubfaction = (teamIdx: number, playerIdx: number, subKey: string) => {
+    setTeams((prev) => {
+      const copy = prev.map((t) => t.slice());
+      const cell = copy[teamIdx][playerIdx] ?? { factionKey: "", subKey: "" };
+      copy[teamIdx][playerIdx] = { ...cell, subKey };
+      return copy;
+    });
+  };
+
+  // Build legacy fields for API from structured selections
+  const { mine, others } = useMemo(() => {
+    const fmt = (p: PlayerSel) =>
+      p.factionKey ? formatFactionChoice(p.factionKey, p.subKey || undefined) : "";
+    const alpha = teams[0]?.[0] ? fmt(teams[0][0]) : "";
+    const rest: string[] = [];
+    teams.forEach((t, ti) =>
+      t.forEach((p, pi) => {
+        if (ti === 0 && pi === 0) return; // skip "mine"
+        const s = fmt(p);
+        if (s) rest.push(s);
+      })
+    );
+    return { mine: alpha, others: rest.join(", ") };
+  }, [teams]);
+
+  // Keep hidden fields in sync
+  useEffect(() => {
+    setValue("playerFaction", mine);
+    setValue("otherFactions", others);
+  }, [mine, others, setValue]);
+
   const onSubmit = async (values: ScenarioInputForm) => {
     setLoading(true);
     setOutput(null);
@@ -53,10 +152,20 @@ export default function Page() {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 15000);
 
+      // Build Warhost structure for the generator
+      const warhosts = teams.map((t, ti) => ({
+        name: WARHOST_NAMES[ti] ?? `Warhost ${ti + 1}`,
+        players: t.map((p) => ({
+          factionKey: p.factionKey,
+          subKey: p.subKey || undefined,
+        })),
+      }));
+      const playersCount = teams.reduce((acc, t) => acc + t.length, 0);
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, warhosts, playersCount }),
         signal: ctrl.signal,
       });
 
@@ -72,12 +181,11 @@ export default function Page() {
       setAiUsed(!!data.aiUsed);
       setAiError(data.aiError ?? null);
 
-      // Save to local history if we got a narrative
       if (data.narrative) {
         const record = {
           id: (globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}`),
           createdAt: new Date().toISOString(),
-          input: values,
+          input: { ...values, warhosts, playersCount },
           narrative: data.narrative,
         };
         addScenario(record);
@@ -124,47 +232,113 @@ export default function Page() {
           >
             <option value="1v1">1v1</option>
             <option value="2v2">2v2</option>
-            <option value="ffa">Free-for-all</option>
+            <option value="3v3">3v3</option>
+            <option value="4v4">4v4</option>
+            <option value="ffa">Free-for-all (4-way)</option>
+            <option value="2v2v2v2">2v2v2v2</option>
           </select>
           {errors.battleFormat && (
             <p className="mt-1 text-sm text-red-400">{errors.battleFormat.message}</p>
           )}
         </div>
 
-        <div>
-          <Label htmlFor="playerFaction">Your side</Label>
-          <Input
-            id="playerFaction"
-            placeholder="Faction"
-            aria-invalid={!!errors.playerFaction}
-            {...register("playerFaction")}
-          />
+        {/* Forces — team-based pickers */}
+        <div className="space-y-3">
+          <Label>Forces (Warhosts & Allegiances)</Label>
+          <p className="text-sm opacity-80">
+            Select a faction and (optional) subfaction for each player slot.
+          </p>
+          <div className="space-y-4">
+            {teams.map((team, ti) => (
+              <div
+                key={`team-${ti}`}
+                className="rounded-2xl border border-white/10 bg-black/40 p-4"
+              >
+                <div className="mb-3 text-lg font-semibold">
+                  {WARHOST_NAMES[ti] ?? `Warhost ${ti + 1}`}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {team.map((player, pi) => {
+                    const subs = getSubfactionOptions(player.factionKey);
+                    return (
+                      <div key={`player-${ti}-${pi}`} className="grid gap-2">
+                        <div className="text-sm opacity-80">Player {pi + 1}</div>
+                        <select
+                          className="rounded-md border border-white/20 bg-black/40 p-2"
+                          value={player.factionKey}
+                          onChange={(e) => setPlayerFaction(ti, pi, e.target.value)}
+                        >
+                          <option value="">Select faction…</option>
+                          {FACTION_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          className="rounded-md border border-white/20 bg-black/40 p-2"
+                          value={player.subKey ?? ""}
+                          onChange={(e) => setPlayerSubfaction(ti, pi, e.target.value)}
+                          disabled={!player.factionKey}
+                        >
+                          <option value="">
+                            {player.factionKey ? "Select subfaction…" : "Select a faction first"}
+                          </option>
+                          {subs.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Hidden legacy fields bound for API */}
+          <input type="hidden" {...register("playerFaction")} />
+          <input type="hidden" {...register("otherFactions")} />
           {errors.playerFaction && (
             <p className="mt-1 text-sm text-red-400">{errors.playerFaction.message}</p>
           )}
-        </div>
-
-        <div>
-          <Label htmlFor="otherFactions">Opponents / other sides</Label>
-          <Input
-            id="otherFactions"
-            placeholder="Other faction(s)"
-            aria-invalid={!!errors.otherFactions}
-            {...register("otherFactions")}
-          />
           {errors.otherFactions && (
             <p className="mt-1 text-sm text-red-400">{errors.otherFactions.message}</p>
           )}
         </div>
 
+        {/* Location / Planet (Segmentum → Planet) */}
         <div>
-          <Label htmlFor="planet">Location</Label>
-          <Input
-            id="planet"
-            placeholder="Planet / theater"
-            aria-invalid={!!errors.planet}
-            {...register("planet")}
-          />
+          <Label>Location / Planet</Label>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <select
+              className="rounded-md border border-white/20 bg-black/40 p-2"
+              value={segmentum}
+              onChange={(e) => setSegmentum(e.target.value)}
+            >
+              <option value="">Any Segmentum</option>
+              {SEGMENTUMS.map((seg) => (
+                <option key={seg} value={seg}>
+                  {seg}
+                </option>
+              ))}
+            </select>
+            <select
+              className="rounded-md border border-white/20 bg-black/40 p-2"
+              onChange={(e) => setValue("planet", e.target.value)}
+            >
+              <option value="">Select planet…</option>
+              {planetOptions.map((opt) => (
+                <option key={opt.value} value={opt.label}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {/* Keep original field wired for API/back-compat */}
+          <input type="hidden" {...register("planet")} />
           {errors.planet && (
             <p className="mt-1 text-sm text-red-400">{errors.planet.message}</p>
           )}
@@ -231,9 +405,9 @@ export default function Page() {
 
           {/* Actions */}
           <div className="mt-3 flex gap-2">
-            <Link href="/campaigns" className="inline-block">
+            <Link href="/saved" className="inline-block">
               <Button className="bg-white text-black hover:bg-white/90">
-                View in Campaigns
+                View in Saved
               </Button>
             </Link>
             <Button
