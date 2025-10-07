@@ -1,0 +1,85 @@
+// app/api/campaigns/[id]/route.ts
+import { NextResponse } from "next/server";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+
+type CampaignMode = "interplanetary" | "sequential-claim";
+
+type UpdateBody = {
+  name?: string;
+  tone?: string | null;
+  mode?: CampaignMode;
+};
+
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  const supabase = await getSupabaseServerClient();
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data, error } = await supabase
+    .from("campaigns")
+    .select("*")
+    .eq("id", params.id)
+    .single();
+
+  if (error) {
+    // RLS “not visible” should look like 406/404 to clients
+    return NextResponse.json({ error: error.message }, { status: error.code === "PGRST116" ? 404 : 500 });
+  }
+
+  return NextResponse.json({ campaign: data });
+}
+
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  const supabase = await getSupabaseServerClient();
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body: UpdateBody = await req.json().catch(() => ({}));
+
+  const patch: Record<string, unknown> = {};
+  if (typeof body.name === "string") patch.name = body.name.trim() || "Untitled Campaign";
+  if (typeof body.tone === "string" || body.tone === null) patch.tone = body.tone ?? null;
+  if (body.mode === "interplanetary" || body.mode === "sequential-claim") patch.mode = body.mode;
+
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: "No valid fields to update." }, { status: 400 });
+  }
+
+  const { data, error } = await supabase
+    .from("campaigns")
+    .update(patch)
+    .eq("id", params.id)
+    .select("*")
+    .single();
+
+  if (error) {
+    // RLS will block if user isn’t allowed (e.g., not owner)
+    return NextResponse.json({ error: error.message }, { status: 403 });
+  }
+
+  return NextResponse.json({ campaign: data });
+}
+
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const supabase = await getSupabaseServerClient();
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { error } = await supabase
+    .from("campaigns")
+    .delete()
+    .eq("id", params.id);
+
+  if (error) {
+    // RLS will block if user isn’t allowed (e.g., not owner)
+    return NextResponse.json({ error: error.message }, { status: 403 });
+  }
+
+  return NextResponse.json({ ok: true });
+}

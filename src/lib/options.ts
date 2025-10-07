@@ -1,6 +1,7 @@
 // FILE: src/lib/options.ts
 import { PLANETS } from "@/data/planets";
 import { FACTIONS } from "@/data/factions";
+import { toneOptions as _toneOptions } from "@/data/tones";
 
 export const SEGMENTUMS: string[] = Array.from(
   new Set(PLANETS.map((p) => p.segmentum))
@@ -33,4 +34,4 @@ export function formatFactionChoice(factionKey?: string, subKey?: string): strin
   if (f) return f.name;
   return "";
 }
-    
+export const getToneOptions = () => _toneOptions();   

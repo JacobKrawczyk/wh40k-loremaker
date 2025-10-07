@@ -1,87 +1,89 @@
-// FILE: src/app/campaigns/page.tsx
-"use client";
-
 import Link from "next/link";
-import { useMemo } from "react";
-import { useCampaignStore } from "@/lib/campaignStore";
-import { useScenarioStore } from "@/lib/scenarioStore";
+import { redirect } from "next/navigation";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import CreateCampaignForm from "@/components/campaign/CreateCampaignForm";
+import JoinCampaignForm from "@/components/campaign/JoinCampaignForm";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-/** Returns a human label for the next upcoming battle.
- *  - Uses only battle times belonging to scenarios that still exist.
- *  - Picks the soonest future time; if none, shows the most recent past time with "(past)".
- */
-function nextBattleLabel(
-  campaign: { scenarioIds: string[]; battleTimes?: Record<string, string | undefined> },
-  existingScenarioIds: Set<string>
-): string {
-  const times = Object.entries(campaign.battleTimes ?? {})
-    .filter(([sid, iso]) => !!iso && existingScenarioIds.has(sid) && campaign.scenarioIds.includes(sid))
-    .map(([, iso]) => Date.parse(iso as string))
-    .filter((t) => !Number.isNaN(t));
+type CampaignRow = {
+  id: string;
+  name: string;
+  tone: string | null;
+  mode: "interplanetary" | "sequential-claim";
+  code: string;
+  created_at: string;
+};
 
-  if (times.length === 0) return "—";
+export default async function CampaignsPage() {
+  // Gate by auth
+  const supabase = await getSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const now = Date.now();
-  const future = times.filter((t) => t >= now).sort((a, b) => a - b);
-  if (future.length > 0) {
-    return new Date(future[0]).toLocaleString();
-    }
-  const latestPast = Math.max(...times);
-  return `${new Date(latestPast).toLocaleString()} (past)`;
-}
+  if (!user) {
+    redirect("/auth/sign-in?next=/campaigns");
+  }
 
-export default function CampaignsPage() {
-  const campaigns = useCampaignStore((s) => s.campaigns);
-  const scenarios = useScenarioStore((s) => s.scenarios);
-  const existingScenarioIds = useMemo(() => new Set(scenarios.map((s) => s.id)), [scenarios]);
-  const empty = campaigns.length === 0;
+  // With RLS, this returns only campaigns the user can see (is a member/owner)
+  const { data, error } = await supabase
+    .from("campaigns")
+    .select("id, name, tone, mode, code, created_at")
+    .order("created_at", { ascending: false });
+
+  const campaigns = (data ?? []) as CampaignRow[];
 
   return (
-    <div className="relative z-10 mx-auto max-w-4xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">Campaigns</h1>
-        <Link href="/campaigns/new">
-          <Button className="bg-white text-black hover:bg-white/90">New Campaign</Button>
+    <div className="mx-auto max-w-4xl space-y-8 p-6">
+      <header className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Campaigns</h1>
+        <Link href="/auth/sign-out">
+          <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+            Sign out
+          </Button>
         </Link>
+      </header>
+
+      {/* Actions */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <CreateCampaignForm />
+        <JoinCampaignForm />
       </div>
 
-      {empty ? (
-        <p className="text-white/70">No campaigns yet. Create one to start organizing scenarios and schedules.</p>
-      ) : (
-        <div className="grid gap-4">
-          {campaigns.map((c) => {
-            const attachedCount = c.scenarioIds.filter((id) => existingScenarioIds.has(id)).length;
-            const nextLabel = nextBattleLabel(c, existingScenarioIds);
-            return (
-              <Card key={c.id} className="bg-black/60 border-white/10 text-white">
-                <CardContent className="p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-lg font-semibold">{c.name}</div>
-                      <div className="text-sm text-white/70">
-                        Tone: {c.tone || "—"} · Code: <span className="font-mono">{c.code}</span> · Scenarios: {attachedCount}
-                      </div>
-                      <div className="text-sm mt-1">
-                        <span className="opacity-80">Next battle:</span> {nextLabel}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Link href={`/campaigns/${c.id}`}>
-                        <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
-                          Open
-                        </Button>
-                      </Link>
-                    </div>
+      {/* List */}
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">My campaigns</h2>
+        {error ? (
+          <p className="text-red-300">Failed to load campaigns: {error.message}</p>
+        ) : campaigns.length === 0 ? (
+          <p className="text-white/70">You haven’t joined or created any campaigns yet.</p>
+        ) : (
+          campaigns.map((c) => (
+            <Card key={c.id} className="bg-black/60 border-white/10 text-white">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="truncate font-semibold">{c.name}</div>
+                  <div className="text-xs opacity-70">
+                    {c.mode === "interplanetary" ? "Interplanetary" : "Conquest"} • Invite code:{" "}
+                    <span className="font-mono">{c.code}</span> •{" "}
+                    {new Date(c.created_at).toLocaleString()}
+                    {c.tone ? ` • Tone: ${c.tone}` : ""}
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                </div>
+                <Link href={`/campaigns/${c.id}`}>
+                  <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                    Open
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </section>
     </div>
   );
 }

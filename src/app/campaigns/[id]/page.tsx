@@ -1,224 +1,139 @@
-// FILE: src/app/campaigns/[id]/page.tsx
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+// appui/src/app/campaigns/[id]/page.tsx
 import Link from "next/link";
-import { useCampaignStore } from "@/lib/campaignStore";
-import { useScenarioStore } from "@/lib/scenarioStore";
+import { redirect, notFound } from "next/navigation";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import ScenariosPanel from "./ScenariosPanel"; // you already have this
+import MembersPanel from "@/components/campaign/MembersPanel";
 
-export default function CampaignRoomPage() {
-  const { id } = useParams() as { id: string };
-  const router = useRouter();
+export const dynamic = "force-dynamic";
 
-  // Stores (hooks must be unconditional)
-  const campaigns = useCampaignStore((s) => s.campaigns);
-  const scenarios = useScenarioStore((s) => s.scenarios);
-  const setBattleTime = useCampaignStore((s) => s.setBattleTime);
-  const detachScenario = useCampaignStore((s) => s.detachScenario);
-  const removeCampaign = useCampaignStore((s) => s.removeCampaign);
+type CampaignRow = {
+  id: string;
+  name: string;
+  tone: string | null;
+  mode: "interplanetary" | "sequential-claim";
+  code: string;
+  created_at: string;
+  owner_id: string;
+};
 
-  // Hydration guard
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => setHydrated(true), []);
+type MemberRow = {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  role: "owner" | "player";
+  created_at: string;
+};
 
-  // Find the campaign (can be undefined on first render)
-  const campaign = useMemo(() => campaigns.find((x) => x.id === id), [campaigns, id]);
+type ProfileRow = {
+  id: string; // user_id
+  display_name: string | null;
+  avatar_url: string | null;
+};
 
-  // Compute attached scenarios regardless of found/not found (empty if not found)
-  const attachedScenarios = useMemo(() => {
-    const ids = campaign?.scenarioIds ?? [];
-    return scenarios.filter((s) => ids.includes(s.id));
-  }, [scenarios, campaign?.scenarioIds]);
+export default async function CampaignPage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const supabase = await getSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  // Helper
-  function copyInvite() {
-    if (!campaign) return;
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const url = `${origin}/campaigns/${campaign.id}?join=${campaign.code ?? ""}`;
-    navigator.clipboard.writeText(url);
+  if (!user) {
+    redirect(`/auth/sign-in?next=/campaigns/${params.id}`);
   }
 
-  function onDeleteCampaign() {
-    if (!campaign) return;
-    const typed = prompt(
-      `To permanently delete this campaign, type DELETE (all caps).\n\nCampaign: "${campaign.name}"`
-    );
-    if (typed !== "DELETE") {
-      alert("Deletion cancelled. You must type DELETE exactly.");
-      return;
-    }
-    removeCampaign(campaign.id);
-    router.push("/campaigns");
-  }
+  // RLS: returns row only if requester is member (or owner)
+  const { data: campaign, error: cErr } = await supabase
+    .from("campaigns")
+    .select("id,name,tone,mode,code,created_at,owner_id")
+    .eq("id", params.id)
+    .maybeSingle();
 
-  // Renders
-  if (!hydrated) {
-    return (
-      <div className="mx-auto max-w-3xl space-y-6 p-6">
-        <div className="h-8 w-72 animate-pulse rounded bg-white/10" />
-        <div className="h-5 w-56 animate-pulse rounded bg-white/10" />
-        <div className="h-[50vh] animate-pulse rounded-2xl border border-white/10 bg-black/50 p-6 backdrop-blur" />
-      </div>
-    );
+  if (cErr) {
+    // if RLS blocked, we’ll get null too
+    redirect("/campaigns");
   }
-
   if (!campaign) {
-    return (
-      <div className="mx-auto max-w-3xl space-y-4 p-6">
-        <h1 className="text-2xl font-semibold text-white">Campaign not found</h1>
-        <p className="text-white/70">The campaign ID doesn&apos;t exist in your local store.</p>
-        <Link href="/campaigns">
-          <Button className="bg-white text-black hover:bg-white/90">Back to Campaigns</Button>
-        </Link>
-      </div>
-    );
+    notFound();
   }
+
+  // Members (simple 2-step fetch to avoid complex FK join)
+  const { data: members, error: mErr } = await supabase
+    .from("campaign_members")
+    .select("id,campaign_id,user_id,role,created_at")
+    .eq("campaign_id", params.id)
+    .order("created_at", { ascending: true });
+
+  if (mErr) {
+    // Don’t hard fail the whole page — render with empty list
+    // But you can choose to throw if you prefer.
+  }
+
+  const userIds = (members ?? []).map((m) => m.user_id);
+  let profiles: ProfileRow[] = [];
+  if (userIds.length > 0) {
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id,display_name,avatar_url")
+      .in("id", userIds);
+    profiles = profs ?? [];
+  }
+  const profileMap = new Map(profiles.map((p) => [p.id, p]));
+
+  const isOwner = user.id === campaign.owner_id;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold">{campaign.name}</h1>
-          <p className="text-white/70">
-            Tone: {campaign.tone || "—"} · Code: <span className="font-mono">{campaign.code ?? "—"}</span>
-          </p>
+    <div className="mx-auto max-w-5xl space-y-6 p-4">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold">{campaign.name}</h1>
+          <div className="text-xs opacity-70">
+            {campaign.mode === "interplanetary" ? "Interplanetary" : "Conquest"} • Invite code:{" "}
+            <span className="font-mono">{campaign.code}</span> •{" "}
+            {new Date(campaign.created_at).toLocaleString()}
+            {campaign.tone ? ` • Tone: ${campaign.tone}` : ""}
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Link href="/campaigns">
             <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
               Back
             </Button>
           </Link>
-          <Button className="bg-white text-black hover:bg-white/90" onClick={copyInvite}>
+          {/* Copy code */}
+          <Button
+            variant="outline"
+            className="border-white/30 text-white hover:bg-white/10"
+            onClick={async () => {
+              "use client";
+              await navigator.clipboard.writeText(campaign.code);
+            }}
+          >
             Copy Invite
           </Button>
+          {/* Danger Zone goes elsewhere later (menu) */}
         </div>
       </div>
 
-      {/* Attached scenarios overview */}
-      <Card className="bg-black/60 border-white/10 text-white">
-        <CardContent className="p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="text-lg font-semibold">Scenarios</div>
-            <Link href="/saved">
-              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
-                Attach from Saved
-              </Button>
-            </Link>
-          </div>
+      {/* Members */}
+      <MembersPanel
+        campaignId={campaign.id}
+        currentUserId={user.id}
+        isOwner={isOwner}
+        members={(members ?? []).map((m) => ({
+          ...m,
+          display_name: profileMap.get(m.user_id)?.display_name ?? null,
+          avatar_url: profileMap.get(m.user_id)?.avatar_url ?? null,
+        }))}
+      />
 
-          {attachedScenarios.length === 0 ? (
-            <p className="text-white/70">
-              No scenarios attached yet. Go to Saved and decide which ones belong to this campaign.
-            </p>
-          ) : (
-            <div className="grid gap-3">
-              {attachedScenarios.map((s) => (
-                <Card key={s.id} className="bg-black/40 border-white/10">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold">
-                          {s.input.campaignName || "Untitled"} — {s.input.planet || "Theater"}
-                        </div>
-                        <div className="text-sm opacity-80">
-                          {(s.input.battleFormat || "1v1").toUpperCase()} · {new Date(s.createdAt).toLocaleString()}
-                        </div>
-                        {/* Schedule display */}
-                        <div className="mt-1 text-sm">
-                          <span className="opacity-70">Scheduled:</span>{" "}
-                          {campaign.battleTimes?.[s.id]
-                            ? new Date(campaign.battleTimes[s.id]!).toLocaleString()
-                            : "—"}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Link href={`/saved/${s.id}`}>
-                          <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
-                            View
-                          </Button>
-                        </Link>
-                        <Button
-                          variant="outline"
-                          className="border-red-400/40 text-red-200 hover:bg-red-500/10"
-                          onClick={() => detachScenario(campaign.id, s.id)}
-                          title="Detach scenario from this campaign"
-                        >
-                          Detach
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Schedule editor */}
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <input
-                        type="datetime-local"
-                        className="rounded-md border border-white/20 bg-black/40 p-2 text-white"
-                        value={campaign.battleTimes?.[s.id] ? toLocalInputValue(campaign.battleTimes[s.id]!) : ""}
-                        onChange={(e) => {
-                          const iso = fromLocalInputValue(e.target.value);
-                          setBattleTime(campaign.id, s.id, iso);
-                        }}
-                      />
-                      <Button
-                        variant="outline"
-                        className="border-white/30 text-white hover:bg-white/10"
-                        onClick={() => setBattleTime(campaign.id, s.id, undefined)}
-                        title="Clear scheduled time"
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Danger Zone (delete campaign) */}
-      <Card className="bg-black/60 border-red-500/30 text-white">
-        <CardContent className="p-5 space-y-3">
-          <div className="text-lg font-semibold text-red-300">Danger Zone</div>
-          <p className="text-sm text-white/80">
-            Deleting a campaign removes it from your device. Saved scenarios remain available in{" "}
-            <span className="underline">/saved</span>.
-          </p>
-          <Button
-            variant="outline"
-            className="border-red-400/40 text-red-200 hover:bg-red-500/10"
-            onClick={onDeleteCampaign}
-            title="Delete this campaign"
-          >
-            Delete Campaign
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Scenarios + Drafts */}
+      <ScenariosPanel campaignId={campaign.id} />
     </div>
   );
-}
-
-// Helpers: convert between ISO and <input type="datetime-local"> local value
-function toLocalInputValue(iso: string): string {
-  try {
-    const d = new Date(iso);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const yyyy = d.getFullYear();
-    const mm = pad(d.getMonth() + 1);
-    const dd = pad(d.getDate());
-    const hh = pad(d.getHours());
-    const mi = pad(d.getMinutes());
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-  } catch {
-    return "";
-  }
-}
-function fromLocalInputValue(local: string): string | undefined {
-  if (!local) return undefined;
-  const d = new Date(local);
-  return isNaN(d.getTime()) ? undefined : d.toISOString();
 }

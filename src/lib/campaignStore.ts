@@ -1,20 +1,25 @@
+// FILE: src/lib/campaignStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+
+/** High-level campaign mode */
+export type CampaignMode = "sequential-claim" | "interplanetary";
 
 export interface CampaignRecord {
   id: string;
   name: string;
   tone?: string;
-  code: string;           // invite code
-  scenarioIds: string[];  // saved scenario ids attached to this campaign (exclusive)
-  createdAt: string;      // ISO
-  // Optional schedule per attached scenario (ISO datetime)
-  battleTimes?: Record<string, string | undefined>;
+  code: string;                 // invite code
+  scenarioIds: string[];        // saved scenario ids attached to this campaign (exclusive)
+  createdAt: string;            // ISO
+  battleTimes?: Record<string, string | undefined>; // per-scenario ISO datetime
+  mode: CampaignMode;           // NEW: campaign mode
 }
 
 type NewCampaign = {
   name: string;
   tone?: string;
+  mode?: CampaignMode;          // optional on create; defaults to "sequential-claim"
 };
 
 type CampaignState = {
@@ -42,7 +47,7 @@ function dedupe<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
 }
 
-// Type guards for persisted state in migrate()
+// -------- persist migration helpers --------
 type PlainState = { campaigns?: CampaignRecord[] };
 type WrapperState = { state?: PlainState; version?: number };
 
@@ -57,7 +62,6 @@ function hasWrapperState(x: unknown): x is WrapperState {
 export const useCampaignStore = create<CampaignState>()(
   persist(
     (set, get) => {
-      // mark get as used to avoid eslint no-unused-vars
       void get;
 
       return {
@@ -67,12 +71,13 @@ export const useCampaignStore = create<CampaignState>()(
           const id = genId();
           const rec: CampaignRecord = {
             id,
-            name: input.name.trim() || "Untitled Campaign",
+            name: (input.name ?? "").trim() || "Untitled Campaign",
             tone: input.tone?.trim() || undefined,
             code: genCode(),
             scenarioIds: [],
             createdAt: new Date().toISOString(),
             battleTimes: {},
+            mode: input.mode ?? "sequential-claim",
           };
           set((s) => ({ campaigns: [rec, ...s.campaigns] }));
           return id;
@@ -140,26 +145,44 @@ export const useCampaignStore = create<CampaignState>()(
     },
     {
       name: "wh40k-campaigns",
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown): unknown => {
-        // Handle both shapes: plain { campaigns: [...] } and wrapper { state: { campaigns: [...] } }
         const normalize = (arr: unknown): CampaignRecord[] => {
           if (!Array.isArray(arr)) return [];
           return arr.map((raw) => {
-            const c = raw as Partial<CampaignRecord>;
+            const c = raw as Partial<CampaignRecord> & { [k: string]: unknown };
+
+            const legacyModeRaw =
+              typeof c.mode === "string" ? c.mode : (c["mode"] as string | undefined);
+
+            const normalizedMode: CampaignMode =
+              legacyModeRaw === "interplanetary"
+                ? "interplanetary"
+                : legacyModeRaw === "planetary"
+                ? "sequential-claim"
+                : (c.mode as CampaignMode) ?? "sequential-claim";
+
+            const normalizedTimes =
+              typeof c.battleTimes === "object" && c.battleTimes
+                ? Object.fromEntries(
+                    Object.entries(c.battleTimes).map(([k, v]) => [
+                      String(k),
+                      v ? String(v) : undefined,
+                    ])
+                  )
+                : {};
+
             return {
               id: String(c.id ?? genId()),
               name: String(c.name ?? "Untitled Campaign"),
               tone: c.tone ? String(c.tone) : undefined,
               code: String(c.code ?? genCode()),
-              scenarioIds: Array.isArray(c.scenarioIds) ? dedupe(c.scenarioIds.map(String)) : [],
+              scenarioIds: Array.isArray(c.scenarioIds)
+                ? dedupe(c.scenarioIds.map(String))
+                : [],
               createdAt: c.createdAt ? String(c.createdAt) : new Date().toISOString(),
-              battleTimes:
-                typeof c.battleTimes === "object" && c.battleTimes
-                  ? Object.fromEntries(
-                      Object.entries(c.battleTimes).map(([k, v]) => [String(k), v ? String(v) : undefined])
-                    )
-                  : {},
+              battleTimes: normalizedTimes,
+              mode: normalizedMode,
             };
           });
         };
@@ -175,7 +198,6 @@ export const useCampaignStore = create<CampaignState>()(
           };
         }
 
-        // Unknown shape; return as-is
         return persisted;
       },
     }
