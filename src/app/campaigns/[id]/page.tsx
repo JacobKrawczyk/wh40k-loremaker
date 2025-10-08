@@ -35,22 +35,23 @@ type ProfileRow = {
 export default async function CampaignPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const supabase = await getSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(`/auth/sign-in?next=/campaigns/${params.id}`);
+    redirect(`/auth/sign-in?next=/campaigns/${id}`);
   }
 
   // RLS: returns row only if requester is member (or owner)
   const { data: campaign, error: cErr } = await supabase
     .from("campaigns")
     .select("id,name,tone,mode,code,created_at,owner_id")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
 
   if (cErr) {
@@ -65,7 +66,7 @@ export default async function CampaignPage({
   const { data: members, error: mErr } = await supabase
     .from("campaign_members")
     .select("id,campaign_id,user_id,role,created_at")
-    .eq("campaign_id", params.id)
+    .eq("campaign_id", id)
     .order("created_at", { ascending: true });
 
   if (mErr) {
