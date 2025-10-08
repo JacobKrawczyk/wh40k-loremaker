@@ -1,10 +1,21 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
+export const dynamic = "force-dynamic";
+
 export default function SignInPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-md p-6 text-white/70">Loading…</div>}>
+      <SignInInner />
+    </Suspense>
+  );
+}
+
+function SignInInner() {
   const sp = useSearchParams();
   const next = sp.get("next") || "/";
 
