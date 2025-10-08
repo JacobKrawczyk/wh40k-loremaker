@@ -2,11 +2,15 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
-export async function DELETE(
-  req: Request,
-  context: { params: Record<string, string> }
-) {
-  const { id, userId } = context.params;
+export async function DELETE(req: Request) {
+  const url = new URL(req.url);
+  const parts = url.pathname.split("/");
+  // Expect: /api/campaigns/{id}/members/{userId}
+  const id = parts[3] ?? "";
+  const userId = parts[5] ?? "";
+  if (!id || !userId) {
+    return new NextResponse("Invalid path parameters", { status: 400 });
+  }
   const supabase = await getSupabaseServerClient();
   const {
     data: { user },
