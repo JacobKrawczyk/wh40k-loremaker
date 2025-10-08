@@ -4,8 +4,9 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string; userId: string } }
+  context: { params: Record<string, string> }
 ) {
+  const { id, userId } = context.params;
   const supabase = await getSupabaseServerClient();
   const {
     data: { user },
@@ -20,7 +21,7 @@ export async function DELETE(
   const { data: campaign } = await supabase
     .from("campaigns")
     .select("id, owner_id")
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
 
   if (!campaign || campaign.owner_id !== user.id) {
@@ -29,15 +30,15 @@ export async function DELETE(
   }
 
   // Don’t allow kicking the owner (even if someone tinkers with client)
-  if (params.userId === campaign.owner_id) {
+  if (userId === campaign.owner_id) {
     return new NextResponse("Cannot remove the owner.", { status: 400 });
   }
 
   const { error: delErr } = await supabase
     .from("campaign_members")
     .delete()
-    .eq("campaign_id", params.id)
-    .eq("user_id", params.userId);
+    .eq("campaign_id", id)
+    .eq("user_id", userId);
 
   if (delErr) {
     return new NextResponse(delErr.message, { status: 400 });
