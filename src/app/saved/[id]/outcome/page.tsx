@@ -19,7 +19,7 @@ export default function MarkOutcomePage() {
   const router = useRouter();
   const scenarios = useScenarioStore((s) => s.scenarios);
   const campaigns = useCampaignStore((s) => s.campaigns);
-  const setOutcome = useOutcomeStore((s) => s.setEpisodeOutcome);
+  const submitOutcome = useOutcomeStore((s) => s.submitOutcome);
   const outcomesByCampaign = useOutcomeStore((s) => s.outcomesByCampaign);
 
   const scenario = scenarios.find((s) => s.id === id);
@@ -72,11 +72,10 @@ export default function MarkOutcomePage() {
       if (Number.isFinite(n) && n !== 0) rpDeltaByFaction[k] = n;
     });
 
-    setOutcome(attachedCampaign.id, scenario.id, {
-      scenarioId: scenario.id,
+    submitOutcome(attachedCampaign.id, scenario.id, {
       planetName: input?.planet,
       factions: derivedFactions,
-      outcomeSummary: summary.trim() || undefined,
+      outcomeSummary: summary.trim(),
       rpDeltaByFaction: Object.keys(rpDeltaByFaction).length ? rpDeltaByFaction : undefined,
       cgpDelta: Number.isFinite(Number(cgpDelta)) ? Number(cgpDelta) : undefined,
     });
