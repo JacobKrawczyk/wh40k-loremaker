@@ -63,7 +63,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ campaign }, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

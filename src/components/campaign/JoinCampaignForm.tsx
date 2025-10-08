@@ -28,8 +28,9 @@ export default function JoinCampaignForm() {
       setMsg("Joined! Redirecting…");
       // Simple refresh to show the new membership in the list
       window.location.reload();
-    } catch (e: any) {
-      setErr(e?.message || "Failed to join.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setErr(msg || "Failed to join.");
     } finally {
       setPending(false);
     }

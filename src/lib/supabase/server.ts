@@ -18,10 +18,10 @@ export async function getSupabaseServerClient() {
       },
       set(name: string, value: string, options: CookieOptions) {
         // Next 14/15 supports set(name, value, options)
-        cookieStore.set(name, value, options as any);
+        cookieStore.set(name, value, options);
       },
       remove(name: string, options: CookieOptions) {
-        cookieStore.set(name, "", { ...(options as any), maxAge: 0 });
+        cookieStore.set(name, "", { ...options, maxAge: 0 });
       },
     },
   });

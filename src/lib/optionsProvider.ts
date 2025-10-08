@@ -15,10 +15,15 @@ function isObj(x: unknown): x is Record<string, unknown> {
 }
 function firstArrayExport(mod: Record<string, unknown>): Record<string, unknown>[] {
   for (const k of Object.keys(mod)) {
-    const v = (mod as any)[k];
-    if (Array.isArray(v) && v.every(isObj)) return v as Record<string, unknown>[];
+    const v = mod[k];
+    if (Array.isArray(v) && v.every(isObj)) {
+      return v as Record<string, unknown>[];
+    }
   }
   return [];
+}
+function get(obj: Record<string, unknown>, key: string): unknown {
+  return obj[key];
 }
 function titleFromKey(k: string): string {
   return k
@@ -28,18 +33,11 @@ function titleFromKey(k: string): string {
     .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-// Cast to an object with optional helpers (avoids TS errors when lib/options doesn't export them)
-const Opt = opt as unknown as {
-  getSegmentumOptions?: () => Option[];
-  getPlanetOptionsBySegmentum?: (seg: string) => Option[];
-  getFactionOptions?: () => Option[];
-  getSubfactionOptions?: (fk: string) => Option[];
-  getToneOptions?: () => Option[];
-};
+// We prefer using concrete exports from lib/options; fallbacks below cover dataset-only cases.
 
 /** ---------- Tone ---------- */
 export function getToneOptions(): Option[] {
-  if (Opt.getToneOptions) return Opt.getToneOptions();
+  if (typeof opt.getToneOptions === "function") return opt.getToneOptions();
   // Fallback baseline tones
   return [
     { value: "grimdark", label: "Grimdark" },
@@ -55,9 +53,9 @@ function fallbackSegmentumOptions(): Option[] {
   const segSet = new Set<string>();
   arr.forEach((p) => {
     const seg =
-      toStr((p as any).segmentum) ||
-      toStr((p as any)["segmentumKey"]) ||
-      toStr((p as any)["segmentum_name"]);
+      toStr(get(p, "segmentum")) ||
+      toStr(get(p, "segmentumKey")) ||
+      toStr(get(p, "segmentum_name"));
     if (seg) segSet.add(seg);
   });
   return Array.from(segSet)
@@ -71,15 +69,15 @@ function fallbackPlanetOptionsBySegmentum(seg: string): Option[] {
   const out: Option[] = [];
   arr.forEach((p) => {
     const segVal =
-      toStr((p as any).segmentum) ||
-      toStr((p as any)["segmentumKey"]) ||
-      toStr((p as any)["segmentum_name"]);
+      toStr(get(p, "segmentum")) ||
+      toStr(get(p, "segmentumKey")) ||
+      toStr(get(p, "segmentum_name"));
     if (segVal && segVal.toLowerCase() === key) {
       const name =
-        toStr((p as any).name) ||
-        toStr((p as any)["label"]) ||
-        toStr((p as any)["title"]);
-      const id = toStr((p as any)["key"]) || name;
+        toStr(get(p, "name")) ||
+        toStr(get(p, "label")) ||
+        toStr(get(p, "title"));
+      const id = toStr(get(p, "key")) || name;
       if (name) out.push({ value: id || name, label: name });
     }
   });
@@ -87,10 +85,16 @@ function fallbackPlanetOptionsBySegmentum(seg: string): Option[] {
 }
 
 export function getSegmentumOptions(): Option[] {
-  return Opt.getSegmentumOptions?.() ?? fallbackSegmentumOptions();
+  if (Array.isArray(opt.SEGMENTUMS)) {
+    return opt.SEGMENTUMS.map((s) => ({ value: s, label: s }));
+  }
+  return fallbackSegmentumOptions();
 }
 export function getPlanetOptionsBySegmentum(seg: string): Option[] {
-  return Opt.getPlanetOptionsBySegmentum?.(seg) ?? fallbackPlanetOptionsBySegmentum(seg);
+  if (typeof opt.getPlanetOptionsBySegmentum === "function") {
+    return opt.getPlanetOptionsBySegmentum(seg);
+  }
+  return fallbackPlanetOptionsBySegmentum(seg);
 }
 
 /** ---------- Factions ---------- */
@@ -134,8 +138,8 @@ function fallbackSubfactionOptions(factionKey: string): Option[] {
   if (Array.isArray(subsRaw)) {
     subsRaw.forEach((sf) => {
       if (isObj(sf)) {
-        const sk = toStr((sf as any)["key"]) || toStr((sf as any)["id"]) || toStr((sf as any)["value"]) || toStr((sf as any)["slug"]);
-        const sn = toStr((sf as any)["name"]) || toStr((sf as any)["label"]) || titleFromKey(sk);
+        const sk = toStr(get(sf, "key")) || toStr(get(sf, "id")) || toStr(get(sf, "value")) || toStr(get(sf, "slug"));
+        const sn = toStr(get(sf, "name")) || toStr(get(sf, "label")) || titleFromKey(sk);
         if (sk) out.push({ value: sk, label: sn || sk });
       } else if (typeof sf === "string") {
         out.push({ value: sf, label: titleFromKey(sf) });
@@ -146,8 +150,13 @@ function fallbackSubfactionOptions(factionKey: string): Option[] {
 }
 
 export function getFactionOptions(): Option[] {
-  return Opt.getFactionOptions?.() ?? fallbackFactionOptions();
+  const fromConst = (opt as unknown as { FACTION_OPTIONS?: Option[] }).FACTION_OPTIONS;
+  if (Array.isArray(fromConst)) return fromConst;
+  return fallbackFactionOptions();
 }
 export function getSubfactionOptions(factionKey: string): Option[] {
-  return Opt.getSubfactionOptions?.(factionKey) ?? fallbackSubfactionOptions(factionKey);
+  if (typeof opt.getSubfactionOptions === "function") {
+    return opt.getSubfactionOptions(factionKey);
+  }
+  return fallbackSubfactionOptions(factionKey);
 }

@@ -18,10 +18,15 @@ function isObj(x: unknown): x is Record<string, unknown> {
 }
 function firstArrayExport(mod: Record<string, unknown>): Record<string, unknown>[] {
   for (const k of Object.keys(mod)) {
-    const v = (mod as any)[k];
-    if (Array.isArray(v) && v.every(isObj)) return v as Record<string, unknown>[];
+    const v = mod[k];
+    if (Array.isArray(v) && v.every(isObj)) {
+      return v as Record<string, unknown>[];
+    }
   }
   return [];
+}
+function get(obj: Record<string, unknown>, key: string): unknown {
+  return obj[key];
 }
 function titleFromKey(k: string): string {
   return k
@@ -37,9 +42,9 @@ function fallbackSegmentumOptions(): Option[] {
   const segSet = new Set<string>();
   arr.forEach((p) => {
     const seg =
-      toStr((p as any).segmentum) ||
-      toStr((p as any)["segmentumKey"]) ||
-      toStr((p as any)["segmentum_name"]);
+      toStr(get(p, "segmentum")) ||
+      toStr(get(p, "segmentumKey")) ||
+      toStr(get(p, "segmentum_name"));
     if (seg) segSet.add(seg);
   });
   return Array.from(segSet)
@@ -52,15 +57,15 @@ function fallbackPlanetOptionsBySegmentum(seg: string): Option[] {
   const out: Option[] = [];
   arr.forEach((p) => {
     const segVal =
-      toStr((p as any).segmentum) ||
-      toStr((p as any)["segmentumKey"]) ||
-      toStr((p as any)["segmentum_name"]);
+      toStr(get(p, "segmentum")) ||
+      toStr(get(p, "segmentumKey")) ||
+      toStr(get(p, "segmentum_name"));
     if (segVal && segVal.toLowerCase() === key) {
       const name =
-        toStr((p as any).name) ||
-        toStr((p as any)["label"]) ||
-        toStr((p as any)["title"]);
-      const id = toStr((p as any)["key"]) || name;
+        toStr(get(p, "name")) ||
+        toStr(get(p, "label")) ||
+        toStr(get(p, "title"));
+      const id = toStr(get(p, "key")) || name;
       if (name) out.push({ value: id || name, label: name });
     }
   });
@@ -108,13 +113,13 @@ function fallbackSubfactionOptions(factionKey: string): Option[] {
     subsRaw.forEach((sf) => {
       if (isObj(sf)) {
         const sk =
-          toStr((sf as any)["key"]) ||
-          toStr((sf as any)["id"]) ||
-          toStr((sf as any)["value"]) ||
-          toStr((sf as any)["slug"]);
+          toStr(get(sf, "key")) ||
+          toStr(get(sf, "id")) ||
+          toStr(get(sf, "value")) ||
+          toStr(get(sf, "slug"));
         const sn =
-          toStr((sf as any)["name"]) ||
-          toStr((sf as any)["label"]) ||
+          toStr(get(sf, "name")) ||
+          toStr(get(sf, "label")) ||
           titleFromKey(sk);
         if (sk) out.push({ value: sk, label: sn || sk });
       } else if (typeof sf === "string") {
@@ -127,14 +132,29 @@ function fallbackSubfactionOptions(factionKey: string): Option[] {
 
 /* ---------- Public, safe getters (prefer builders) ---------- */
 export function getSegmentumOptionsSafe(): Option[] {
-  return (opt as any).getSegmentumOptions?.() ?? fallbackSegmentumOptions();
+  if (Array.isArray(opt.SEGMENTUMS)) {
+    return opt.SEGMENTUMS.map((s) => ({ value: s, label: s }));
+  }
+  return fallbackSegmentumOptions();
 }
 export function getPlanetOptionsBySegmentumSafe(seg: string): Option[] {
-  return (opt as any).getPlanetOptionsBySegmentum?.(seg) ?? fallbackPlanetOptionsBySegmentum(seg);
+  if (typeof opt.getPlanetOptionsBySegmentum === "function") {
+    return opt.getPlanetOptionsBySegmentum(seg);
+  }
+  return fallbackPlanetOptionsBySegmentum(seg);
 }
 export function getFactionOptionsSafe(): Option[] {
-  return (opt as any).getFactionOptions?.() ?? fallbackFactionOptions();
+  if (Array.isArray(opt.FACTIONS)) {
+    // If needed, map; but options.ts exposes FACTION_OPTIONS already
+  }
+  if (Array.isArray((opt as unknown as { FACTION_OPTIONS?: Option[] }).FACTION_OPTIONS)) {
+    return ((opt as unknown as { FACTION_OPTIONS: Option[] }).FACTION_OPTIONS);
+  }
+  return fallbackFactionOptions();
 }
 export function getSubfactionOptionsSafe(fk: string): Option[] {
-  return (opt as any).getSubfactionOptions?.(fk) ?? fallbackSubfactionOptions(fk);
+  if (typeof opt.getSubfactionOptions === "function") {
+    return opt.getSubfactionOptions(fk);
+  }
+  return fallbackSubfactionOptions(fk);
 }
