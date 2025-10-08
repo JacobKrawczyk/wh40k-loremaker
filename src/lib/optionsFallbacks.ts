@@ -144,9 +144,6 @@ export function getPlanetOptionsBySegmentumSafe(seg: string): Option[] {
   return fallbackPlanetOptionsBySegmentum(seg);
 }
 export function getFactionOptionsSafe(): Option[] {
-  if (Array.isArray(opt.FACTIONS)) {
-    // If needed, map; but options.ts exposes FACTION_OPTIONS already
-  }
   if (Array.isArray((opt as unknown as { FACTION_OPTIONS?: Option[] }).FACTION_OPTIONS)) {
     return ((opt as unknown as { FACTION_OPTIONS: Option[] }).FACTION_OPTIONS);
   }
