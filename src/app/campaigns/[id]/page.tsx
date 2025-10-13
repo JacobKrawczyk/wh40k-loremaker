@@ -8,23 +8,7 @@ import MembersPanel from "@/components/campaign/MembersPanel";
 
 export const dynamic = "force-dynamic";
 
-type CampaignRow = {
-  id: string;
-  name: string;
-  tone: string | null;
-  mode: "interplanetary" | "sequential-claim";
-  code: string;
-  created_at: string;
-  created_by: string;
-};
-
-type MemberRow = {
-  id: string;
-  campaign_id: string;
-  user_id: string;
-  role: "owner" | "player";
-  created_at: string;
-};
+// (Inline types removed to avoid unused type warnings)
 
 type ProfileRow = {
   id: string; // user_id

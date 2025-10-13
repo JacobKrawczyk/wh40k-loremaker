@@ -28,42 +28,45 @@ type OutcomeState = {
 
 export const useOutcomeStore = create<OutcomeState>()(
   persist(
-    (set, get) => ({
-      outcomesByCampaign: {},
+    (set, get) => {
+      void get; // avoid unused-parameter warning
+      return {
+        outcomesByCampaign: {},
 
-      submitOutcome: (campaignId, scenarioId, outcome) => {
-        const rec: OutcomeRecord = {
-          ...outcome,
-          scenarioId,
-          createdAt: new Date().toISOString(),
-        };
-        set((s) => {
-          const byCamp = { ...(s.outcomesByCampaign[campaignId] ?? {}) };
-          byCamp[scenarioId] = rec;
-          return {
-            outcomesByCampaign: {
-              ...s.outcomesByCampaign,
-              [campaignId]: byCamp,
-            },
+        submitOutcome: (campaignId, scenarioId, outcome) => {
+          const rec: OutcomeRecord = {
+            ...outcome,
+            scenarioId,
+            createdAt: new Date().toISOString(),
           };
-        });
-      },
+          set((s) => {
+            const byCamp = { ...(s.outcomesByCampaign[campaignId] ?? {}) };
+            byCamp[scenarioId] = rec;
+            return {
+              outcomesByCampaign: {
+                ...s.outcomesByCampaign,
+                [campaignId]: byCamp,
+              },
+            };
+          });
+        },
 
-      removeOutcome: (campaignId, scenarioId) => {
-        set((s) => {
-          const byCamp = { ...(s.outcomesByCampaign[campaignId] ?? {}) };
-          delete byCamp[scenarioId];
-          return {
-            outcomesByCampaign: {
-              ...s.outcomesByCampaign,
-              [campaignId]: byCamp,
-            },
-          };
-        });
-      },
+        removeOutcome: (campaignId, scenarioId) => {
+          set((s) => {
+            const byCamp = { ...(s.outcomesByCampaign[campaignId] ?? {}) };
+            delete byCamp[scenarioId];
+            return {
+              outcomesByCampaign: {
+                ...s.outcomesByCampaign,
+                [campaignId]: byCamp,
+              },
+            };
+          });
+        },
 
-      clearAll: () => set({ outcomesByCampaign: {} }),
-    }),
+        clearAll: () => set({ outcomesByCampaign: {} }),
+      };
+    },
     { name: "wh40k-outcomes", version: 1 }
   )
 );

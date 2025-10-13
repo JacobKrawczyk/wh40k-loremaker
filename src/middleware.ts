@@ -39,7 +39,6 @@ export async function middleware(req: NextRequest) {
   // Ask Supabase for the user (also refreshes session if needed and sets cookies on `res`)
   const {
     data: { user },
-    error,
   } = await supabase.auth.getUser();
 
   if (!user) {

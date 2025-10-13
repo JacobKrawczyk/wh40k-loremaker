@@ -81,36 +81,7 @@ export default function ScenariosPanel({ campaignId }: { campaignId: string }) {
     setStakes("");
   };
 
-  const previousEpisodes = useMemo(() => {
-    if (!campaign) return [];
-    const cmap = outcomesByCampaign[campaign.id] || {};
-    return campaign.scenarioIds
-      .map((sid) => {
-        const scen = scenarios.find((s) => s.id === sid);
-        const out = cmap[sid];
-
-        let factions: string[] = out?.factions ?? [];
-        if ((!factions || factions.length === 0) && scen?.input?.warhosts) {
-          const names: string[] = [];
-          (scen.input.warhosts as WarhostInput[]).forEach((wh) => {
-            (wh.players || []).forEach((p) => {
-              const nm = formatFactionChoice(p.factionKey, p.subKey);
-              if (nm) names.push(nm);
-            });
-          });
-          factions = names;
-        }
-
-        const planetName = out?.planetName ?? (scen?.input as ScenarioInput | undefined)?.planet;
-        const outcomeSummary = out?.outcomeSummary;
-        const rpDeltaByFaction = out?.rpDeltaByFaction;
-        const cgpDelta = out?.cgpDelta;
-
-        if (!scen && !out) return null;
-        return { scenarioId: sid, planetName, factions, outcomeSummary, rpDeltaByFaction, cgpDelta };
-      })
-      .filter(Boolean) as NonNullable<CampaignEpisodeInput["campaign"]>["previousEpisodes"];
-  }, [campaign, outcomesByCampaign, scenarios]);
+  // previousEpisodes are derived on-demand where needed via buildPrevEpisodes()
 
   const [outcomeTarget, setOutcomeTarget] = useState<null | { id: string; input: ScenarioInput }>(
     null
