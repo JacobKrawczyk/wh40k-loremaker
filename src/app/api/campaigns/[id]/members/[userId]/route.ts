@@ -21,20 +21,20 @@ export async function DELETE(req: Request) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  // Optional extra guard: ensure requester is the owner of this campaign
+  // Optional extra guard: ensure requester is the owner (creator) of this campaign
   const { data: campaign } = await supabase
     .from("campaigns")
-    .select("id, owner_id")
+    .select("id, created_by")
     .eq("id", id)
     .maybeSingle();
 
-  if (!campaign || campaign.owner_id !== user.id) {
+  if (!campaign || campaign.created_by !== user.id) {
     // RLS will also block delete, but we fail early with a clear message
     return new NextResponse("Only the campaign owner can remove members.", { status: 403 });
   }
 
   // Don’t allow kicking the owner (even if someone tinkers with client)
-  if (userId === campaign.owner_id) {
+  if (userId === campaign.created_by) {
     return new NextResponse("Cannot remove the owner.", { status: 400 });
   }
 

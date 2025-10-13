@@ -15,7 +15,7 @@ type CampaignRow = {
   mode: "interplanetary" | "sequential-claim";
   code: string;
   created_at: string;
-  owner_id: string;
+  created_by: string;
 };
 
 type MemberRow = {
@@ -50,7 +50,7 @@ export default async function CampaignPage({
   // RLS: returns row only if requester is member (or owner)
   const { data: campaign, error: cErr } = await supabase
     .from("campaigns")
-    .select("id,name,tone,mode,code,created_at,owner_id")
+    .select("id,name,tone,mode,code,created_at,created_by")
     .eq("id", id)
     .maybeSingle();
 
@@ -79,13 +79,14 @@ export default async function CampaignPage({
   if (userIds.length > 0) {
     const { data: profs } = await supabase
       .from("profiles")
-      .select("id,display_name,avatar_url")
+      // alias username -> display_name for UI compatibility
+      .select("id,display_name:username,avatar_url")
       .in("id", userIds);
-    profiles = profs ?? [];
+    profiles = (profs as ProfileRow[]) ?? [];
   }
   const profileMap = new Map(profiles.map((p) => [p.id, p]));
 
-  const isOwner = user.id === campaign.owner_id;
+  const isOwner = user.id === campaign.created_by;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4">
