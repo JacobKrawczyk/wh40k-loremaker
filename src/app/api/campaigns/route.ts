@@ -38,6 +38,7 @@ export async function POST(req: Request) {
         name,
         tone,
         mode,
+        created_by: user.id,
         code: genCode(),
       })
       .select("*")
