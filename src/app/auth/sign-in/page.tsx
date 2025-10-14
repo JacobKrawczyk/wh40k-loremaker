@@ -95,7 +95,12 @@ function SignInInner() {
       </div>
 
       <div className="mt-3 text-sm text-white/70">
-        New here? <a className="underline" href={`/auth/sign-up?next=${encodeURIComponent(next)}`}>Create an account</a>
+        <div>
+          New here? <a className="underline" href={`/auth/sign-up?next=${encodeURIComponent(next)}`}>Create an account</a>
+        </div>
+        <div className="mt-1">
+          Forgot your password? <a className="underline" href={`/auth/forgot?next=${encodeURIComponent(next)}`}>Reset it</a>
+        </div>
       </div>
     </div>
   );
