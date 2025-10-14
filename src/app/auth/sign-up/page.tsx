@@ -109,7 +109,7 @@ function SignUpInner() {
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -128,7 +128,6 @@ export default function SignUpPage() {
 function SignUpInner() {
   const supabase = getSupabaseBrowserClient();
   const sp = useSearchParams();
-  const router = useRouter();
   const next = sp.get("next") || "/";
 
   const [email, setEmail] = useState("");
@@ -137,7 +136,7 @@ function SignUpInner() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // Password strength rules (client-side)
+  // Password guidance (Supabase will enforce on the server)
   const rules = useMemo(
     () => [
       { key: "len", label: "At least 8 characters", ok: password.length >= 8 },
@@ -147,7 +146,6 @@ function SignUpInner() {
     ],
     [password]
   );
-  const strong = useMemo(() => rules.every((r) => r.ok), [rules]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,26 +156,19 @@ function SignUpInner() {
       setErr("Please enter an email and password.");
       return;
     }
-    if (!strong) {
-      setErr("Password must have at least 8 chars, one uppercase, one lowercase, and one number.");
-      return;
-    }
 
     try {
       setBusy(true);
       const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
-
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: { emailRedirectTo: redirectTo },
       });
-
       if (error) {
         setErr(error.message || "Sign-up failed.");
         return;
       }
-
       setMsg("Check your email to confirm your account.");
     } finally {
       setBusy(false);
@@ -209,7 +200,6 @@ function SignUpInner() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            minLength={8}
             required
           />
           <ul className="mt-2 space-y-1 text-xs">
@@ -221,7 +211,7 @@ function SignUpInner() {
           </ul>
         </div>
 
-        <Button type="submit" disabled={busy || !strong} className="bg-white text-black hover:bg-white/90 disabled:opacity-60">
+        <Button type="submit" disabled={busy} className="bg-white text-black hover:bg-white/90 disabled:opacity-60">
           {busy ? "Creating…" : "Create account"}
         </Button>
 
@@ -238,4 +228,3 @@ function SignUpInner() {
     </div>
   );
 }
-
