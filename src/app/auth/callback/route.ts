@@ -3,7 +3,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const code = url.searchParams.get("code") ?? url.searchParams.get("token_hash");
+  const code = url.searchParams.get("code") ?? url.searchParams.get("token_hash") ?? url.searchParams.get("token");
   const rawNext = url.searchParams.get("next");`n  const next = rawNext ? decodeURIComponent(rawNext) : "/auth/reset";
 
   if (code) {
