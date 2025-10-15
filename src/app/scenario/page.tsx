@@ -172,7 +172,7 @@ export default function Page() {
 
       if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`HTTP ${res.status} ${res.statusText} Ã¢â‚¬â€œ ${txt}`);
+        throw new Error(`HTTP ${res.status} ${res.statusText} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ ${txt}`);
       }
 
       const data = (await res.json()) as ApiResp;
@@ -192,7 +192,7 @@ export default function Page() {
     } catch (err) {
       console.error("Generate failed:", err);
       setOutput(
-        `Request failed.\n\nTip: DevTools Ã¢â€ â€™ Network Ã¢â€ â€™ /api/generate to see status/response.\n${String(
+        `Request failed.\n\nTip: DevTools ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Network ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ /api/generate to see status/response.\n${String(
           err
         )}`
       );
@@ -241,7 +241,7 @@ export default function Page() {
           )}
         </div>
 
-        {/* Forces Ã¢â‚¬â€ team-based pickers */}
+        {/* Forces ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â team-based pickers */}
         <div className="space-y-3">
           <Label>Forces (Warhosts & Allegiances)</Label>
           <p className="text-sm opacity-80">
@@ -267,7 +267,7 @@ export default function Page() {
                           value={player.factionKey}
                           onChange={(e) => setPlayerFaction(ti, pi, e.target.value)}
                         >
-                          <option value="">Select factionÃ¢â‚¬Â¦</option>
+                          <option value="">Select factionÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</option>
                           {FACTION_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
                               {opt.label}
@@ -281,7 +281,7 @@ export default function Page() {
                           disabled={!player.factionKey}
                         >
                           <option value="">
-                            {player.factionKey ? "Select subfactionÃ¢â‚¬Â¦" : "Select a faction first"}
+                            {player.factionKey ? "Select subfactionÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦" : "Select a faction first"}
                           </option>
                           {subs.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -308,7 +308,7 @@ export default function Page() {
           )}
         </div>
 
-        {/* Location / Planet (Segmentum Ã¢â€ â€™ Planet) */}
+        {/* Location / Planet (Segmentum ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Planet) */}
         <div>
           <Label>Location / Planet</Label>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -328,7 +328,7 @@ export default function Page() {
               className="rounded-md border border-white/20 bg-black/40 p-2"
               onChange={(e) => setValue("planet", e.target.value)}
             >
-              <option value="">Select planet..."hidden" {...register("planet")} />
+              <option value="">Select planet...</option>\n              {planetOptions.map((opt) => (\n                <option key={opt.value} value={opt.label}>\n                  {opt.label}\n                </option>\n              ))}\n            </select>\n            {/* Keep original field wired for API/back-compat */}\n            <input type="hidden" {...register("planet")} />
           {errors.planet && (
             <p className="mt-1 text-sm text-red-400">{errors.planet.message}</p>
           )}
@@ -361,7 +361,7 @@ export default function Page() {
         </div>
 
         <Button type="submit" disabled={loading}>
-          {loading ? "GeneratingÃ¢â‚¬Â¦" : "Generate"}
+          {loading ? "Generating..." : "Generate"}
         </Button>
       </form>
 
