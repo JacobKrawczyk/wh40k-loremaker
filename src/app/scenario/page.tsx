@@ -308,7 +308,7 @@ export default function Page() {
           )}
         </div>
 
-        {/* Location / Planet (Segmentum ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Planet) */}
+        {/* Location / Planet (Segmentum → Planet) */}
         <div>
           <Label>Location / Planet</Label>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -328,7 +328,15 @@ export default function Page() {
               className="rounded-md border border-white/20 bg-black/40 p-2"
               onChange={(e) => setValue("planet", e.target.value)}
             >
-              <option value="">Select planet...</option>\n              {planetOptions.map((opt) => (\n                <option key={opt.value} value={opt.label}>\n                  {opt.label}\n                </option>\n              ))}\n            </select>\n            {/* Keep original field wired for API/back-compat */}\n            <input type="hidden" {...register("planet")} />
+              <option value="">Select planet...</option>
+              {planetOptions.map((opt) => (
+                <option key={opt.value} value={opt.label}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {/* Keep original field wired for API/back-compat */}
+            <input type="hidden" {...register("planet")} />
           {errors.planet && (
             <p className="mt-1 text-sm text-red-400">{errors.planet.message}</p>
           )}
