@@ -25,7 +25,7 @@ export interface CampaignContext {
   tone?: string;
   mode: CampaignMode;
   planetName?: string;                // fixed world when mode === "planetary"
-  previousEpisodes?: EpisodeMeta[];   // latest-first or chronological; caller’s choice
+  previousEpisodes?: EpisodeMeta[];   // latest-first or chronological; callerâ€™s choice
 }
 
 export interface CampaignEpisodeInput {
@@ -156,7 +156,7 @@ export async function enhanceWithOpenAI(opts: {
     "Keep risk scores and tables; you may clarify wording.",
     "Use EVERY team/faction listed in the Warhost roster. Write distinct per-faction intros in appropriate voices.",
     "If a Campaign Context is provided, maintain continuity: reference prior outcomes, relics, location damage, and absent characters where appropriate.",
-    "Output ONLY raw Markdown — do not wrap your answer in code fences.",
+    "Output ONLY raw Markdown â€” do not wrap your answer in code fences.",
   ].join(" ");
 
   const minimal = {
@@ -209,21 +209,34 @@ export async function enhanceWithOpenAI(opts: {
     .filter(Boolean)
     .join("\n");
 
-  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.7,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
-  });
+    // Add a defensive timeout so the route can fall back quickly
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000); // 10s
+  let resp: Response;
+  try {
+    resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.7,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`OpenAI request failed: ${msg}`);
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!resp.ok) {
     const text = await resp.text();
@@ -250,7 +263,7 @@ export function unwrapMarkdown(s: string): string {
   const m2 = txt.match(/^```\s*\n([\s\S]*?)\n```$/);
   if (m2) return m2[1].trim();
 
-  // Starts with fence but no tidy close — strip first/last fence lines if present
+  // Starts with fence but no tidy close â€” strip first/last fence lines if present
   if (txt.startsWith("```")) {
     return txt.replace(/^```[^\n]*\n?/, "").replace(/```$/, "").trim();
   }
