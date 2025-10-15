@@ -172,7 +172,7 @@ export default function Page() {
 
       if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`HTTP ${res.status} ${res.statusText} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ ${txt}`);
+        throw new Error(`HTTP ${res.status} ${res.statusText} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ ${txt}`);
       }
 
       const data = (await res.json()) as ApiResp;
@@ -192,7 +192,7 @@ export default function Page() {
     } catch (err) {
       console.error("Generate failed:", err);
       setOutput(
-        `Request failed.\n\nTip: DevTools ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Network ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ /api/generate to see status/response.\n${String(
+        `Request failed.\n\nTip: DevTools ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Network ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ /api/generate to see status/response.\n${String(
           err
         )}`
       );
@@ -241,7 +241,7 @@ export default function Page() {
           )}
         </div>
 
-        {/* Forces ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â team-based pickers */}
+        {/* Forces ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â team-based pickers */}
         <div className="space-y-3">
           <Label>Forces (Warhosts & Allegiances)</Label>
           <p className="text-sm opacity-80">
@@ -267,7 +267,7 @@ export default function Page() {
                           value={player.factionKey}
                           onChange={(e) => setPlayerFaction(ti, pi, e.target.value)}
                         >
-                          <option value="">Select factionÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</option>
+                          <option value="">Select factionÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦</option>
                           {FACTION_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
                               {opt.label}
@@ -281,7 +281,7 @@ export default function Page() {
                           disabled={!player.factionKey}
                         >
                           <option value="">
-                            {player.factionKey ? "Select subfactionÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦" : "Select a faction first"}
+                            {player.factionKey ? "Select subfactionÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦" : "Select a faction first"}
                           </option>
                           {subs.map((opt) => (
                             <option key={opt.value} value={opt.value}>
