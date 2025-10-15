@@ -149,8 +149,7 @@ export default function Page() {
     setAiError(null);
 
     try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 15000);
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), Number(process.env.NEXT_PUBLIC_GENERATE_TIMEOUT_MS || 120000));
 
       // Build Warhost structure for the generator
       const warhosts = teams.map((t, ti) => ({
@@ -173,7 +172,7 @@ export default function Page() {
 
       if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`HTTP ${res.status} ${res.statusText} – ${txt}`);
+        throw new Error(`HTTP ${res.status} ${res.statusText} â€“ ${txt}`);
       }
 
       const data = (await res.json()) as ApiResp;
@@ -193,7 +192,7 @@ export default function Page() {
     } catch (err) {
       console.error("Generate failed:", err);
       setOutput(
-        `Request failed.\n\nTip: DevTools → Network → /api/generate to see status/response.\n${String(
+        `Request failed.\n\nTip: DevTools â†’ Network â†’ /api/generate to see status/response.\n${String(
           err
         )}`
       );
@@ -242,7 +241,7 @@ export default function Page() {
           )}
         </div>
 
-        {/* Forces — team-based pickers */}
+        {/* Forces â€” team-based pickers */}
         <div className="space-y-3">
           <Label>Forces (Warhosts & Allegiances)</Label>
           <p className="text-sm opacity-80">
@@ -268,7 +267,7 @@ export default function Page() {
                           value={player.factionKey}
                           onChange={(e) => setPlayerFaction(ti, pi, e.target.value)}
                         >
-                          <option value="">Select faction…</option>
+                          <option value="">Select factionâ€¦</option>
                           {FACTION_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
                               {opt.label}
@@ -282,7 +281,7 @@ export default function Page() {
                           disabled={!player.factionKey}
                         >
                           <option value="">
-                            {player.factionKey ? "Select subfaction…" : "Select a faction first"}
+                            {player.factionKey ? "Select subfactionâ€¦" : "Select a faction first"}
                           </option>
                           {subs.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -309,7 +308,7 @@ export default function Page() {
           )}
         </div>
 
-        {/* Location / Planet (Segmentum → Planet) */}
+        {/* Location / Planet (Segmentum â†’ Planet) */}
         <div>
           <Label>Location / Planet</Label>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -329,7 +328,7 @@ export default function Page() {
               className="rounded-md border border-white/20 bg-black/40 p-2"
               onChange={(e) => setValue("planet", e.target.value)}
             >
-              <option value="">Select planet…</option>
+              <option value="">Select planetâ€¦</option>
               {planetOptions.map((opt) => (
                 <option key={opt.value} value={opt.label}>
                   {opt.label}
@@ -371,7 +370,7 @@ export default function Page() {
         </div>
 
         <Button type="submit" disabled={loading}>
-          {loading ? "Generating…" : "Generate"}
+          {loading ? "Generatingâ€¦" : "Generate"}
         </Button>
       </form>
 
@@ -397,7 +396,7 @@ export default function Page() {
                   className="rounded-md bg-yellow-600/20 px-2 py-1 text-yellow-200"
                   title={aiError ?? undefined}
                 >
-                  Template fallback{aiError ? " — check console/logs" : ""}
+                  Template fallback{aiError ? " â€” check console/logs" : ""}
                 </span>
               )}
             </div>
