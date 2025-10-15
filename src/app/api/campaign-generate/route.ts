@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const runtime = "nodejs";
 import type { ScenarioInput, WarhostInput, BattleFormat } from "@/lib/types";
 import {
   generateScenario,
@@ -107,7 +108,7 @@ export async function POST(req: Request) {
     if (summaries.length) parts.push(`Prior=${summaries.join(" | ")}`);
   }
 
-  const continuityTag = parts.length ? `Continuity → ${parts.join("; ")}` : "";
+  const continuityTag = parts.length ? `Continuity â†’ ${parts.join("; ")}` : "";
 
   // ------- legacy campaign context for enhancer -------
   const legacyCtx: LegacyCampaignContext | undefined =
