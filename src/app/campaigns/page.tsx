@@ -41,11 +41,7 @@ export default async function CampaignsPage() {
     <div className="mx-auto max-w-4xl space-y-8 p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Campaigns</h1>
-        <Link href="/auth/sign-out">
-          <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
-            Sign out
-          </Button>
-        </Link>
+        <form action="/auth/sign-out" method="post">\n          <Button type="submit" variant="outline" className="border-white/30 text-white hover:bg-white/10">\n            Sign out\n          </Button>\n        </form>
       </header>
 
       {/* Actions */}
@@ -60,7 +56,7 @@ export default async function CampaignsPage() {
         {error ? (
           <p className="text-red-300">Failed to load campaigns: {error.message}</p>
         ) : campaigns.length === 0 ? (
-          <p className="text-white/70">You haven’t joined or created any campaigns yet.</p>
+          <p className="text-white/70">You havenâ€™t joined or created any campaigns yet.</p>
         ) : (
           campaigns.map((c) => (
             <Card key={c.id} className="bg-black/60 border-white/10 text-white">
@@ -68,10 +64,10 @@ export default async function CampaignsPage() {
                 <div className="min-w-0">
                   <div className="truncate font-semibold">{c.name}</div>
                   <div className="text-xs opacity-70">
-                    {c.mode === "interplanetary" ? "Interplanetary" : "Conquest"} • Invite code:{" "}
-                    <span className="font-mono">{c.code}</span> •{" "}
+                    {c.mode === "interplanetary" ? "Interplanetary" : "Conquest"} â€¢ Invite code:{" "}
+                    <span className="font-mono">{c.code}</span> â€¢{" "}
                     {new Date(c.created_at).toLocaleString()}
-                    {c.tone ? ` • Tone: ${c.tone}` : ""}
+                    {c.tone ? ` â€¢ Tone: ${c.tone}` : ""}
                   </div>
                 </div>
                 <Link href={`/campaigns/${c.id}`}>
