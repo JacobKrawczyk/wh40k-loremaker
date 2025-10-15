@@ -172,7 +172,7 @@ export default function Page() {
 
       if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`HTTP ${res.status} ${res.statusText} â€“ ${txt}`);
+        throw new Error(`HTTP ${res.status} ${res.statusText} Ã¢â‚¬â€œ ${txt}`);
       }
 
       const data = (await res.json()) as ApiResp;
@@ -192,7 +192,7 @@ export default function Page() {
     } catch (err) {
       console.error("Generate failed:", err);
       setOutput(
-        `Request failed.\n\nTip: DevTools â†’ Network â†’ /api/generate to see status/response.\n${String(
+        `Request failed.\n\nTip: DevTools Ã¢â€ â€™ Network Ã¢â€ â€™ /api/generate to see status/response.\n${String(
           err
         )}`
       );
@@ -241,7 +241,7 @@ export default function Page() {
           )}
         </div>
 
-        {/* Forces â€” team-based pickers */}
+        {/* Forces Ã¢â‚¬â€ team-based pickers */}
         <div className="space-y-3">
           <Label>Forces (Warhosts & Allegiances)</Label>
           <p className="text-sm opacity-80">
@@ -267,7 +267,7 @@ export default function Page() {
                           value={player.factionKey}
                           onChange={(e) => setPlayerFaction(ti, pi, e.target.value)}
                         >
-                          <option value="">Select factionâ€¦</option>
+                          <option value="">Select factionÃ¢â‚¬Â¦</option>
                           {FACTION_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
                               {opt.label}
@@ -281,7 +281,7 @@ export default function Page() {
                           disabled={!player.factionKey}
                         >
                           <option value="">
-                            {player.factionKey ? "Select subfactionâ€¦" : "Select a faction first"}
+                            {player.factionKey ? "Select subfactionÃ¢â‚¬Â¦" : "Select a faction first"}
                           </option>
                           {subs.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -308,7 +308,7 @@ export default function Page() {
           )}
         </div>
 
-        {/* Location / Planet (Segmentum â†’ Planet) */}
+        {/* Location / Planet (Segmentum Ã¢â€ â€™ Planet) */}
         <div>
           <Label>Location / Planet</Label>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -328,16 +328,7 @@ export default function Page() {
               className="rounded-md border border-white/20 bg-black/40 p-2"
               onChange={(e) => setValue("planet", e.target.value)}
             >
-              <option value="">Select planetâ€¦</option>
-              {planetOptions.map((opt) => (
-                <option key={opt.value} value={opt.label}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {/* Keep original field wired for API/back-compat */}
-          <input type="hidden" {...register("planet")} />
+              <option value="">Select planet..."hidden" {...register("planet")} />
           {errors.planet && (
             <p className="mt-1 text-sm text-red-400">{errors.planet.message}</p>
           )}
@@ -370,7 +361,7 @@ export default function Page() {
         </div>
 
         <Button type="submit" disabled={loading}>
-          {loading ? "Generatingâ€¦" : "Generate"}
+          {loading ? "GeneratingÃ¢â‚¬Â¦" : "Generate"}
         </Button>
       </form>
 
@@ -396,7 +387,7 @@ export default function Page() {
                   className="rounded-md bg-yellow-600/20 px-2 py-1 text-yellow-200"
                   title={aiError ?? undefined}
                 >
-                  Template fallback{aiError ? " â€” check console/logs" : ""}
+                  Template fallback
                 </span>
               )}
             </div>
