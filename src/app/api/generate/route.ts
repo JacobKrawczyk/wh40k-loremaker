@@ -1,5 +1,6 @@
 // FILE: src/app/api/generate/route.ts
 import { NextResponse } from "next/server";
+export const runtime = "nodejs";
 import type { ScenarioInput, WarhostInput } from "@/lib/types";
 import { generateScenario } from "@/lib/generator";
 
